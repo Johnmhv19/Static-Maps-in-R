@@ -1,0 +1,233 @@
+---
+title: "Dom. Rep. static and dinamic maps in R"
+author: "John Hernandez"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  toc: true
+---
+
+*Content:*
+
+1. [Introduction](#1st-Bullet)
+2. [Importing, Vizualising and Manipulating Shapefiles](#2nd-Bullet)
+3. [Creating maps graphs](#3rd-Bullet)
+
+
+
+## Introduction <a class="anchor" id="1st-Bullet"></a>
+The purpose of this document is to give you a hand creating Static, Animated, and Dynamic Maps in R using for example the Energy Source distribution in The Dominican Republic territory.
+
+I assume you have installed Rstudio. If not please refer to the [Rstudio download page]("https://rstudio.com/products/rstudio/download/").
+
+
+Let's install and load the following packages:
+
+* tmap      -> To graph spatial polygons.
+* rgdal     -> To read  __"spatialpolygonsdataframe"__ files.
+* tidyverse -> To visualize and modify data.
+* readxl    -> To read __Excel__ Files
+* leaflet   -> For interactive maps
+* raster    -> Mainly to download __Shape__ files.
+* gridExtra -> In case you want to create a grid of graphs.
+* sf        -> To manage Spatial type data.
+* viridis   -> Maps.
+
+
+
+```{r, warning=FALSE}
+x <- c("ggmap", "rgdal", "rgeos", "maptools", "dplyr", "tidyr", "tmap", "ggplot2","leaflet","raster","gridExtra", "sf","viridis","readxl")
+
+
+#install.packages(x)
+lapply(x,library, character.only = TRUE)
+```
+*Note*:I have started the line where I install the packages with a __#__ changing it to a *comment*. If you haven't installed the packages remember to delete the __#__ symbol.
+
+
+## Importing, Visualizing and Manipulating Shapefiles<a class="anchor" id="2nd-Bullet"></a>
+
+Having the *.shp* National Cartography's files, we can import the files corresponding to regions and/or provinces. We will use the *readOGR()* function for this.  
+
+```{r, warning=FALSE}
+map_region <- readOGR(dsn="J:/Documents memory/Proyecto con Joseph/ShapeFilesCenso2010/REGCenso2010.shp")
+map_province <-readOGR(dsn = "J:/Documents memory/Proyecto con Joseph/ShapeFilesCenso2010/PROVCenso2010.shp")
+```
+
+Lets plot the most basic Province map 
+```{r, warning=FALSE}
+plot(map_province)
+```
+
+### Accediendo al componente data
+
+El componente data de los SpatialPolygonsDataFrame es el elemento que con más frecuencia tendremos que manipular. Esto porque por lo general los shapefiles no traen información sobre las áreas geográficas más que aquellas sirven para identificar las mismas.
+
+
+map_province and map_region have the code per province or region and its name. Later we will add more data.
+```{r, warning=FALSE}
+map_province@data
+```
+
+Since the provinces names are written in Spanish we need to eliminate the accent marks.
+
+```{r, warning=FALSE}
+map_province@data[5,3] <- "DAJABON"
+map_province@data[7,3] <- "ELIAS PINA"
+map_province@data[14,3]<- "MARIA TRINIDAD SANCHEZ"
+map_province@data[20,3]<- "SAMANA"
+map_province@data[21,3]<- "SAN CRISTOBAL"
+map_province@data[23,3]<- "SAN PEDRO DE MACORIS"
+map_province@data[24,3]<- "SANCHEZ RAMIREZ"
+map_province@data[26,3]<- "SANTIAGO RODRIGUEZ"
+map_province@data[28,3]<- "MONSENOR NOUEL"
+map_province@data[31,3]<- "SAN JOSE DE OCOA"
+
+```
+
+Let see that now our provinces names doesn't have any more problem with the accents marks
+```{r, warning=FALSE}
+map_province@data
+```
+
+
+We have create a Energy Source Excel File that indicates the Installed Capacity
+and type of source (fuel oil, Hydroelectric, Solar, and Wind) per provinces.
+
+Lets see this table
+```{r, warning=FALSE}
+energy_source <- read_xlsx("J:/Documents memory/Proyecto con Joseph/EnergySourceProvinces.xlsx")
+head(energy_source)
+map_province2 <-map_province
+```
+
+```{r, warning=FALSE}
+i<-0
+for (i in 1:32){
+  map_province2@data$Fuel_Oil[i] <- energy_source$Fuel_Oil[i]
+  map_province2@data$Hydroelectric[i] <- energy_source$Hydroelectric[i]
+  map_province2@data$Solar[i] <- energy_source$Solar[i]
+  map_province2@data$Wind[i] <- energy_source$Wind[i]
+  map_province2@data$Natural_Gas[i] <- energy_source$Natural_Gas[i]
+  map_province2@data$Coal[i] <- energy_source$Coal[i]
+  map_province2@data$Diesel[i] <- energy_source$Diesel[i]
+}
+  
+map_province2@data
+  
+```
+
+## Creating maps graphs<a class="anchor" id="3rd-Bullet"></a>
+
+### General Visualization
+
+In this visualization 
+```{r, warning=FALSE}
+#tmap_options_reset()
+tmap_mode("plot")+
+  tm_shape(map_province2) + tm_borders(col="navajowhite4")+
+  tm_bubbles(size = "Hydroelectric", col = "blue") + tm_tiles("Hydroelectric (MW)")+
+  tm_bubbles(size = "Hydroelectric", col = "blue") + tm_tiles("Hydroelectric(MW)")+
+  tm_bubbles(size = "Natural_Gas", col = "mediumvioletred") +tm_tiles("Natural Gas(MW)")+
+  tm_bubbles(size = "Solar", col = "gold") + tm_tiles("Solar (MW)")+
+  tm_bubbles(size = "Wind", col = "chartreuse") + tm_tiles("Wind (MW)")+
+  tm_bubbles(size = "Coal", col = "black") + tm_tiles("Coal (MW)")+
+  tm_bubbles(size = "Diesel", col = "chocolate") +tm_tiles("Diesel (MW)")+
+  tm_bubbles(size = "Fuel_Oil", col = "brown") +  tm_tiles("Fuel_Oil (MW)")+
+  tm_scale_bar()+ tm_compass(type= "8star", position = c("right","top"))+
+  tm_layout(legend.outside = TRUE,scale = 0.9)
+
+```
+
+### Static Heat Maps by Energy Sources
+
+#### Fuel oil
+
+```{r, warning=FALSE}
+fuel_oil<-tm_shape(map_province2)+tm_polygons(col="Fuel_Oil", palette= "Oranges", title = "Fuel Oil (MW)")+
+  tm_scale_bar()+ tm_compass(type= "8star",position = c("right","top"))
+fuel_oil
+```
+
+#### Hydroelectric
+
+```{r, warning=FALSE}
+Hydroelectric<-tm_shape(map_province2)+tm_polygons(col="Hydroelectric", palette= "Blues", title = "Hydroelectric (MW)")+
+  tm_scale_bar()+ tm_compass(type= "8star",position = c("right","top"))
+Hydroelectric
+```
+
+#### Solar
+
+```{r, warning=FALSE}
+Solar<-tm_shape(map_province2)+tm_polygons(col="Solar", palette= "YlOrRd", title = "Solar (MW)")+
+  tm_scale_bar()+ tm_compass(type= "8star",position = c("right","top"))+tm_text("TOPONIMIA", size = 0.45, fontfamily = "sans")
+Solar
+
+```
+
+#### Wind
+
+```{r, warning=FALSE}
+Wind<-tm_shape(map_province2)+tm_polygons(col="Wind", palette= "GnBu", title="Wind (MW)")+
+  tm_scale_bar()+ tm_compass(type= "8star",position = c("right","top"))
+wind
+```
+
+#### Diesel
+
+```{r, warning=FALSE}
+Diesel<-tm_shape(map_province2)+tm_polygons(col="Diesel", palette= "OrRd", title="Diesel (MW)")+
+  tm_scale_bar()+ tm_compass(type= "8star",position = c("right","top"))
+Diesel
+```
+
+
+#### Coal
+
+```{r, warning=FALSE}
+Coal<-tm_shape(map_province2)+tm_polygons(col="Coal", palette= "Greys", title="Coal (MW)")+
+  tm_scale_bar()+ tm_compass(type= "8star",position = c("right","top"))
+Coal
+```
+
+#### Natural Gas
+
+```{r, warning=FALSE}
+Natural_Gas<-tm_shape(map_province2)+tm_polygons(col="Natural_Gas", palette= "BuGn", title = "Natural Gas (MW)")+
+  tm_scale_bar()+ tm_compass(type= "8star",position = c("right","top"))
+Natural_Gas
+```
+
+
+
+#### Saving the Maps' plots as PNG files.
+
+Now that we know that all the amps are as we wish, we can save them as png files.
+
+```{r, warning=FALSE, results='hide'}
+# Natural GAS
+tmap_save(Natural_Gas, filename = "Natural_Gas.png")
+
+#Fuel Oil
+tmap_save(fuel_oil, filename = "Fuel_oil.png")
+
+#Coal
+tmap_save(Coal, filename = "Coal.png")
+
+#Wind
+tmap_save(Wind, filename = "Wind.png")
+
+#Diesel
+tmap_save(Diesel, filename = "Diesel.png")
+
+#Solar
+tmap_save(Solar, filename = "Solar.png")
+
+#Hydroeletric
+tmap_save(Hydroeletric, filename = "Hydroeletric.png")
+
+```
+
+
